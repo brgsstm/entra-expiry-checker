@@ -1,0 +1,20 @@
+# Development dependencies
+# Install with: pip install -r requirements-dev.txt
+
+# Core dependencies (from requirements.txt)
+-r requirements.txt
+
+# Build dependencies
+build
+twine
+wheel
+
+# Testing dependencies
+pytest
+pytest-cov
+
+# Code quality tools
+black
+flake8
+mypy
+pre-commit 

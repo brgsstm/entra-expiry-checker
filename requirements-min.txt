@@ -1,0 +1,10 @@
+# Core dependencies
+python-decouple
+requests
+
+# Azure dependencies
+azure-identity
+azure-data-tables
+
+# Email service
+sendgrid

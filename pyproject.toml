@@ -1,0 +1,121 @@
+[build-system]
+requires = ["setuptools", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "entra-expiry-checker"
+version = "1.0.0"
+description = "Microsoft Entra App Registration Credential Expiry Checker"
+readme = "README.md"
+license = {text = "MIT"}
+authors = [
+    {name = "Tom Burgess", email = "tom@tburgess.co.uk"},
+]
+maintainers = [
+    {name = "Tom Burgess", email = "tom@tburgess.co.uk"},
+]
+keywords = ["azure", "microsoft-graph", "entra-id", "app-registration", "credential-expiry", "monitoring"]
+classifiers = [
+    "Development Status :: 5 - Production/Stable",
+    "Intended Audience :: Developers",
+    "Intended Audience :: System Administrators",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: System :: Monitoring",
+    "Topic :: System :: Systems Administration",
+    "Topic :: Utilities",
+]
+requires-python = ">=3.11"
+dependencies = [
+    "python-decouple",
+    "requests",
+    "azure-identity",
+    "azure-data-tables",
+    "sendgrid",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest",
+    "pytest-cov",
+    "black",
+    "flake8",
+    "mypy",
+    "pre-commit",
+    "build",
+    "twine",
+    "wheel",
+]
+
+[project.urls]
+Homepage = "https://github.com/brgsstm/entra-expiry-checker"
+Documentation = "https://github.com/brgsstm/entra-expiry-checker#readme"
+Repository = "https://github.com/brgsstm/entra-expiry-checker"
+Bug Tracker = "https://github.com/brgsstm/entra-expiry-checker/issues"
+
+[project.scripts]
+entra-expiry-checker = "entra_expiry_checker.main:main"
+
+[tool.setuptools.packages.find]
+include = ["entra_expiry_checker*"]
+
+[tool.black]
+line-length = 88
+target-version = ['py38']
+include = '\.pyi?$'
+extend-exclude = '''
+/(
+  # directories
+  \.eggs
+  | \.git
+  | \.hg
+  | \.mypy_cache
+  | \.tox
+  | \.venv
+  | build
+  | dist
+)/
+'''
+
+[tool.flake8]
+max-line-length = 88
+extend-ignore = ["E203", "W503"]
+exclude = [
+    ".git",
+    "__pycache__",
+    "build",
+    "dist",
+    ".venv",
+    ".eggs",
+]
+
+[tool.mypy]
+python_version = "3.11"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = true
+disallow_incomplete_defs = true
+check_untyped_defs = true
+disallow_untyped_decorators = true
+no_implicit_optional = true
+warn_redundant_casts = true
+warn_unused_ignores = true
+warn_no_return = true
+warn_unreachable = true
+strict_equality = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py", "*_test.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+addopts = [
+    "--strict-markers",
+    "--strict-config",
+    "--cov=entra_expiry_checker",
+    "--cov-report=term-missing",
+]

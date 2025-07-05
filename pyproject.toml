@@ -55,7 +55,7 @@ dev = [
 Homepage = "https://github.com/brgsstm/entra-expiry-checker"
 Documentation = "https://github.com/brgsstm/entra-expiry-checker#readme"
 Repository = "https://github.com/brgsstm/entra-expiry-checker"
-Bug Tracker = "https://github.com/brgsstm/entra-expiry-checker/issues"
+"Bug Tracker" = "https://github.com/brgsstm/entra-expiry-checker/issues"
 
 [project.scripts]
 entra-expiry-checker = "entra_expiry_checker.main:main"

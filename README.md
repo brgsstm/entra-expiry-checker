@@ -140,48 +140,148 @@ Reads onboarded App Registrations from Azure Table Storage. This mode is useful 
 
 ### GitHub Actions
 
+> **Recommended Authentication**: For GitHub Actions, it's recommended to use an Azure user-assigned managed identity with federated credentials. This provides secure, credential-free authentication without storing secrets. See [Microsoft's guide](https://learn.microsoft.com/en-us/azure/developer/github/connect-from-azure-identity#use-the-azure-login-action-with-user-assigned-managed-identity) for setup instructions.
+
 ```yaml
-name: Check Credential Expiry
+name: Check App Registration Credential Expiry
+
 on:
   schedule:
-    - cron: "0 9 * * *" # Daily at 9 AM UTC
+    # Run daily at 9 AM UTC
+    - cron: '0 9 * * *'
+  workflow_dispatch:  # Allow manual triggering
+
+env:
+  PYTHON_VERSION: '3.13'
+
+permissions:
+  id-token: write
+  contents: read
 
 jobs:
-  check:
+  check-credentials:
     runs-on: ubuntu-latest
+    
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v4
-        with:
-          python-version: "3.13"
-      - run: pip install entra-expiry-checker
-      - run: entra-expiry-checker
-        env:
-          SG_API_KEY: ${{ secrets.SG_API_KEY }}
-          FROM_EMAIL: ${{ vars.FROM_EMAIL }}
-          MODE: ${{ vars.MODE }}
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ env.PYTHON_VERSION }}
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install entra-expiry-checker
+
+    - name: Azure Login
+      uses: azure/login@v1
+      with:
+        client-id: ${{ secrets.AZURE_CLIENT_ID }}
+        tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+        subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+    - name: Check credential expiry
+      run: entra-expiry-checker
+      env:
+        # SendGrid configuration (always required)
+        SG_API_KEY: ${{ secrets.SG_API_KEY }}
+        FROM_EMAIL: ${{ vars.FROM_EMAIL }}
+        
+        # Operation mode
+        MODE: ${{ vars.MODE || 'tenant' }}
+        
+        # Days threshold
+        DAYS_THRESHOLD: ${{ vars.DAYS_THRESHOLD || '30' }}
+
+        # Tenant mode configuration (optional if MODE=tenant)
+        DEFAULT_NOTIFICATION_EMAIL: ${{ vars.DEFAULT_NOTIFICATION_EMAIL }}
+        
+        # Storage mode configuration (only needed if MODE=storage)
+        STG_ACCT_NAME: ${{ vars.STG_ACCT_NAME }}
+        STG_ACCT_TABLE_NAME: ${{ vars.STG_ACCT_TABLE_NAME }}
+        
+        # SSL verification (set to false to disable SSL certificate verification)
+        VERIFY_SSL: ${{ vars.VERIFY_SSL || 'true' }}
+
+    - name: Handle failure
+      if: failure()
+      run: |
+        echo "❌ Credential expiry check failed!"
+        echo "Check the logs above for details."
+        # Could add additional notification here (Slack, Teams, etc.) 
 ```
 
 ### Azure DevOps
 
+> **Recommended Authentication**: For Azure DevOps, it's recommended to use workload identity federation with a user-assigned managed identity. This provides secure, credential-free authentication without storing secrets. See [Microsoft's guide](https://learn.microsoft.com/en-us/azure/devops/pipelines/release/configure-workload-identity?view=azure-devops&tabs=managed-identity) for setup instructions.
+
 ```yaml
-trigger: none
+trigger: none  # No CI trigger - only scheduled runs
+
 schedules:
-  - cron: "0 9 * * *"
-    displayName: Daily credential check
+- cron: "0 9 * * *"  # Daily at 9 AM UTC
+  displayName: Check App Registration Credential Expiry
+  branches:
+    include:
+    - main # Modify as appropriate
+  always: true
 
 pool:
-  vmImage: "ubuntu-latest"
+  vmImage: 'ubuntu-latest'
 
-steps:
-  - task: UsePythonVersion@0
-    inputs:
-      versionSpec: "3.13"
-  - script: pip install entra-expiry-checker
-  - script: entra-expiry-checker
-    env:
-      SG_API_KEY: $(SG_API_KEY)
-      FROM_EMAIL: $(FROM_EMAIL)
+variables:
+  PYTHON_VERSION: '3.13'
+
+stages:
+- stage: CheckCredentials
+  displayName: 'Check App Registration Credential Expiry'
+  jobs:
+  - job: CheckCredentials
+    displayName: 'Check Credential Expiry'
+    steps:
+    - task: UsePythonVersion@0
+      displayName: 'Set up Python'
+      inputs:
+        versionSpec: '$(PYTHON_VERSION)'
+        addToPath: true
+
+    - task: AzureCLI@2
+      displayName: 'Login and Run Tooling'
+      inputs:
+        azureSubscription: '$(AZURE_SUBSCRIPTION)'  # Service connection name
+        scriptType: 'bash'
+        scriptLocation: 'inlineScript'
+        inlineScript: |
+          echo "Successfully authenticated with Azure"
+          az account show
+          
+          # Install Python dependencies
+          python -m pip install --upgrade pip
+          pip install entra-expiry-checker
+          
+          # Run the credential check script
+          entra-expiry-checker
+      env:
+        # SendGrid configuration (always required)
+        SG_API_KEY: $(SG_API_KEY)
+        FROM_EMAIL: $(FROM_EMAIL)
+        
+        # Tenant mode configuration (only needed if MODE=tenant)
+        DEFAULT_NOTIFICATION_EMAIL: $(DEFAULT_NOTIFICATION_EMAIL)
+        
+        # Storage mode configuration (only needed if MODE=storage)
+        STG_ACCT_NAME: $(STG_ACCT_NAME)
+        STG_ACCT_TABLE_NAME: $(STG_ACCT_TABLE_NAME)
+
+    - script: |
+        echo "❌ Credential expiry check failed!"
+        echo "Check the logs above for details."
+        # Could add additional notification here (Slack, Teams, etc.)
+      displayName: 'Handle failure'
+      condition: failed()
 ```
 
 ## Contributing
@@ -203,6 +303,10 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 - 💡 [Feature Requests](https://github.com/brgsstm/entra-expiry-checker/issues)
 
 ## Changelog
+
+### 1.0.1 (2025-06-05)
+
+- Documentation updates
 
 ### 1.0.0 (2025-06-05)
 

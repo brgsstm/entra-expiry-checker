@@ -47,7 +47,7 @@ jobs:
             const body = `Release ${tag}
 
             Changes in this release:
-            - Initial release`;
+            - Documentation updates`;
 
             await github.rest.repos.createRelease({
               owner: context.repo.owner,

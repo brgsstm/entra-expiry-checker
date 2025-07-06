@@ -304,6 +304,10 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## Changelog
 
+### 1.0.2 (2025-06-06)
+
+- Fix incorrect secret/certificate count in email body
+
 ### 1.0.1 (2025-06-05)
 
 - Documentation updates

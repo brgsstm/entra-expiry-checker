@@ -47,7 +47,7 @@ jobs:
             const body = `Release ${tag}
 
             Changes in this release:
-            - Documentation updates`;
+            - Fix incorrect secret/certificate count in email body`;
 
             await github.rest.repos.createRelease({
               owner: context.repo.owner,

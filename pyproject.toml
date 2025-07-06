@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "entra-expiry-checker"
-version = "1.0.1"
+version = "1.0.2"
 description = "Microsoft Entra App Registration Credential Expiry Checker"
 readme = "README.md"
 license = {text = "MIT"}

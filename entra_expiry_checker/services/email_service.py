@@ -144,8 +144,8 @@ class EmailService:
                 <p><strong>App Name:</strong> {result.app_registration.display_name}</p>
                 <p><strong>App ID:</strong> {result.app_registration.app_id}</p>
                 <p><strong>Object ID:</strong> {result.app_registration.object_id}</p>
-                <p><strong>Total Secrets:</strong> {result.app_registration.total_secrets}</p>
-                <p><strong>Total Certificates:</strong> {result.app_registration.total_certificates}</p>
+                <p><strong>Expiring Secrets:</strong> {len(result.expiring_secrets)}</p>
+                <p><strong>Expiring Certificates:</strong> {len(result.expiring_certificates)}</p>
                 <p><strong>Days Threshold:</strong> {result.days_threshold}</p>
             </div>
 

@@ -3,12 +3,12 @@ Microsoft Graph API client for interacting with Azure AD app registrations.
 """
 
 import sys
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
 try:
     import requests
-    from azure.core.exceptions import (ClientAuthenticationError,
-                                       ResourceNotFoundError)
+    from requests.exceptions import HTTPError, RequestException
+    from azure.core.exceptions import ClientAuthenticationError, ResourceNotFoundError
     from azure.identity import DefaultAzureCredential
 except ImportError as e:
     print(f"Missing required dependency: {e}")
@@ -18,7 +18,7 @@ except ImportError as e:
 class MicrosoftGraphClient:
     """Client for interacting with Microsoft Graph API."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize the Microsoft Graph client using DefaultAzureCredential."""
         self.base_url = "https://graph.microsoft.com/v1.0"
         self.credential = DefaultAzureCredential()
@@ -26,8 +26,7 @@ class MicrosoftGraphClient:
     def get_access_token(self) -> str:
         """Get access token for Microsoft Graph API."""
         try:
-            token = self.credential.get_token(
-                "https://graph.microsoft.com/.default")
+            token = self.credential.get_token("https://graph.microsoft.com/.default")
             return token.token
         except ClientAuthenticationError as e:
             print(f"Authentication failed: {e}")
@@ -66,8 +65,7 @@ class MicrosoftGraphClient:
                 try:
                     error_data = response.json()
                     error_code = error_data.get("error", {}).get("code", "")
-                    error_message = error_data.get(
-                        "error", {}).get("message", "")
+                    error_message = error_data.get("error", {}).get("message", "")
 
                     if (
                         "Request_BadRequest" in error_code
@@ -82,39 +80,34 @@ class MicrosoftGraphClient:
 
             # Handle other specific status codes
             if response.status_code == 401:
-                raise requests.exceptions.HTTPError(
-                    "Unauthorized - check your credentials and permissions"
-                )
+                response.raise_for_status()  # This will raise HTTPError
             elif response.status_code == 403:
-                raise requests.exceptions.HTTPError(
-                    "Forbidden - insufficient permissions to access this resource"
-                )
+                response.raise_for_status()  # This will raise HTTPError
             elif response.status_code == 404:
                 raise ResourceNotFoundError("Resource not found")
             elif response.status_code == 429:
-                raise requests.exceptions.HTTPError(
-                    "Rate limited - too many requests")
+                response.raise_for_status()  # This will raise HTTPError
             elif response.status_code >= 500:
-                raise requests.exceptions.HTTPError(
-                    f"Server error: {response.status_code}"
-                )
+                response.raise_for_status()  # This will raise HTTPError
 
             # Raise for any other HTTP errors
             response.raise_for_status()
-            return response.json()
+            result: Dict[str, Any] = response.json()
+            return result
 
-        except (ResourceNotFoundError, requests.exceptions.HTTPError):
-            # Re-raise these specific exceptions for proper handling
+        except ResourceNotFoundError:
+            # Re-raise ResourceNotFoundError for proper handling
             raise
-        except requests.exceptions.RequestException as e:
-            # For network/connection errors, provide more context
-            raise requests.exceptions.RequestException(
-                f"Network error making request to {endpoint}: {e}"
-            )
+        except HTTPError:
+            # Re-raise HTTPError for proper handling
+            raise
+        except RequestException:
+            # Re-raise network/connection errors as-is
+            # The original exception message is sufficient
+            raise
         except Exception as e:
             # Catch any other unexpected errors
-            raise Exception(
-                f"Unexpected error making request to {endpoint}: {e}")
+            raise Exception(f"Unexpected error making request to {endpoint}: {e}")
 
     def get_all_applications(self) -> List[Dict[str, Any]]:
         """
@@ -124,18 +117,20 @@ class MicrosoftGraphClient:
             List of all applications with their basic information
         """
         applications = []
-        endpoint = "/applications"
+        current_endpoint: Optional[str] = "/applications"
 
-        while endpoint:
+        while current_endpoint:
             try:
-                response = self.make_request(endpoint)
+                response = self.make_request(current_endpoint)
                 applications.extend(response.get("value", []))
 
                 # Check for next page
-                endpoint = response.get("@odata.nextLink")
-                if endpoint:
+                next_link = response.get("@odata.nextLink")
+                if next_link and isinstance(next_link, str):
                     # Remove the base URL to get just the endpoint
-                    endpoint = endpoint.replace(self.base_url, "")
+                    current_endpoint = next_link.replace(self.base_url, "")
+                else:
+                    current_endpoint = None
 
             except Exception as e:
                 print(f"❌ Error fetching applications: {e}")

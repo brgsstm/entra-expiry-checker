@@ -51,9 +51,13 @@ class TableStorageClient:
             query = self.table_client.list_entities()
 
             for entity in query:
+                email = entity.get("PartitionKey")
+                object_id = entity.get("RowKey")
+                if email is None or object_id is None:
+                    continue  # Skip entities with missing required fields
                 table_entity = TableEntity(
-                    email=entity.get("PartitionKey"),
-                    object_id=entity.get("RowKey"),
+                    email=email,
+                    object_id=object_id,
                     timestamp=entity.get("Timestamp"),
                     etag=entity.get("etag"),
                 )

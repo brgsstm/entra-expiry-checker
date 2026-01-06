@@ -11,7 +11,7 @@ from decouple import UndefinedValueError, config
 class Settings:
     """Application settings loaded from environment variables."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize settings but don't load environment variables yet."""
         self._email_provider: Optional[str] = None
         self._sg_api_key: Optional[str] = None
@@ -30,7 +30,7 @@ class Settings:
         self._verify_ssl: Optional[bool] = None
         self._loaded = False
 
-    def _load_config(self):
+    def _load_config(self) -> None:
         """Load configuration from environment variables."""
         if self._loaded:
             return
@@ -96,15 +96,13 @@ class Settings:
             self._stg_acct_name = None
 
         try:
-            self._stg_acct_table_name = config(
-                "STG_ACCT_TABLE_NAME", default=None)
+            self._stg_acct_table_name = config("STG_ACCT_TABLE_NAME", default=None)
         except UndefinedValueError:
             self._stg_acct_table_name = None
 
         # Application settings
         try:
-            self._days_threshold = config(
-                "DAYS_THRESHOLD", default=30, cast=int)
+            self._days_threshold = config("DAYS_THRESHOLD", default=30, cast=int)
         except UndefinedValueError:
             self._days_threshold = 30
 
@@ -148,6 +146,8 @@ class Settings:
     def FROM_EMAIL(self) -> str:
         """Get the from email address."""
         self._load_config()
+        if self._from_email is None:
+            raise ValueError("FROM_EMAIL is not set")
         return self._from_email
 
     @property
@@ -202,12 +202,16 @@ class Settings:
     def DAYS_THRESHOLD(self) -> int:
         """Get days threshold."""
         self._load_config()
+        if self._days_threshold is None:
+            return 30  # Default value
         return self._days_threshold
 
     @property
     def MODE(self) -> str:
         """Get operation mode."""
         self._load_config()
+        if self._mode is None:
+            return "tenant"  # Default value
         return self._mode
 
     @property
@@ -270,8 +274,7 @@ class Settings:
                 )
 
             if not self._stg_acct_table_name:
-                errors.append(
-                    "STG_ACCT_TABLE_NAME is required when MODE=storage")
+                errors.append("STG_ACCT_TABLE_NAME is required when MODE=storage")
             elif not self._is_valid_table_name(self._stg_acct_table_name):
                 errors.append(
                     "STG_ACCT_TABLE_NAME must be 3-63 characters, alphanumeric and hyphens only"
@@ -333,7 +336,7 @@ class Settings:
         pattern = r"^[a-zA-Z0-9]([a-zA-Z0-9-]*[a-zA-Z0-9])?$"
         return bool(re.match(pattern, name)) and 3 <= len(name) <= 63
 
-    def print_config(self):
+    def print_config(self) -> None:
         """Print current configuration (safe for missing variables)."""
         self._load_config()
 
@@ -360,8 +363,7 @@ class Settings:
 
         if self._mode == "storage":
             print(f"   Storage Account: {self._stg_acct_name or 'NOT SET'}")
-            print(
-                f"   Storage Table: {self._stg_acct_table_name or 'NOT SET'}")
+            print(f"   Storage Table: {self._stg_acct_table_name or 'NOT SET'}")
         elif self._mode == "tenant":
             print(
                 f"   Default Notification Email: {self._default_notification_email or 'NOT SET'}"

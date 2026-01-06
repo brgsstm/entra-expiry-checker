@@ -8,12 +8,13 @@ import smtplib
 from abc import ABC, abstractmethod
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
-from typing import Optional
+from typing import Any
 
 try:
-    import requests
+    import requests  # noqa: F401
     from sendgrid import SendGridAPIClient
     from sendgrid.helpers.mail import Mail
+
     SENDGRID_AVAILABLE = True
 except ImportError:
     SENDGRID_AVAILABLE = False
@@ -23,9 +24,7 @@ from ..models import ExpiryCheckResult
 
 def _build_expiry_email_body(result: ExpiryCheckResult) -> str:
     """Build HTML email body for expiring credentials (shared by all providers)."""
-    total_expiring = len(result.expiring_secrets) + len(
-        result.expiring_certificates
-    )
+    total_expiring = len(result.expiring_secrets) + len(result.expiring_certificates)
 
     html = f"""
     <html>
@@ -68,9 +67,7 @@ def _build_expiry_email_body(result: ExpiryCheckResult) -> str:
         """
 
         for i, secret in enumerate(result.expiring_secrets, 1):
-            status_class = (
-                "expired-status" if secret.is_expired else "expiring-status"
-            )
+            status_class = "expired-status" if secret.is_expired else "expiring-status"
             status_text = "EXPIRED" if secret.is_expired else "EXPIRING SOON"
             item_class = (
                 "credential-item expired"
@@ -161,7 +158,7 @@ class SendGridProvider(EmailProvider):
         self._configure_ssl(verify_ssl)
         self.sg = SendGridAPIClient(api_key=api_key)
 
-    def _configure_ssl(self, verify_ssl: bool):
+    def _configure_ssl(self, verify_ssl: bool) -> None:
         """Configure SSL verification for SendGrid requests."""
         if not verify_ssl:
             # Set environment variable to disable SSL verification
@@ -173,13 +170,17 @@ class SendGridProvider(EmailProvider):
             ssl_context.verify_mode = ssl.CERT_NONE
 
             # Monkey patch the default SSL context
-            ssl._create_default_https_context = lambda: ssl_context
+            def _create_context() -> ssl.SSLContext:
+                return ssl_context
+
+            # Type ignore needed because we're monkey-patching a module-level function
+            ssl._create_default_https_context = _create_context  # type: ignore[assignment]
 
             # Also patch requests to use our SSL context
             import requests.adapters
 
             class CustomHTTPAdapter(requests.adapters.HTTPAdapter):
-                def init_poolmanager(self, *args, **kwargs):
+                def init_poolmanager(self, *args: Any, **kwargs: Any) -> Any:
                     kwargs["ssl_context"] = ssl_context
                     return super().init_poolmanager(*args, **kwargs)
 
@@ -227,9 +228,7 @@ class SendGridProvider(EmailProvider):
                 )
                 return True
             else:
-                print(
-                    f"❌ Failed to send email. Status code: {response.status_code}"
-                )
+                print(f"❌ Failed to send email. Status code: {response.status_code}")
                 print(f"❌ Response body: {response.body}")
                 return False
 
@@ -312,7 +311,7 @@ class SMTPProvider(EmailProvider):
 
             # Connect and send
             if self.use_ssl:
-                server = smtplib.SMTP_SSL(
+                server: smtplib.SMTP | smtplib.SMTP_SSL = smtplib.SMTP_SSL(
                     self.host, self.port, context=ssl_context
                 )
             else:

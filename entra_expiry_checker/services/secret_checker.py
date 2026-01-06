@@ -48,7 +48,10 @@ class CredentialCheckerService:
         """
         endpoint = f"/applications/{object_id}/passwordCredentials"
         response = self.graph_client.make_request(endpoint)
-        return response.get("value", [])
+        value = response.get("value", [])
+        if not isinstance(value, list):
+            return []
+        return value
 
     def get_app_certificates(self, object_id: str) -> list:
         """
@@ -62,7 +65,10 @@ class CredentialCheckerService:
         """
         endpoint = f"/applications/{object_id}/keyCredentials"
         response = self.graph_client.make_request(endpoint)
-        return response.get("value", [])
+        value = response.get("value", [])
+        if not isinstance(value, list):
+            return []
+        return value
 
     def check_expiring_credentials(
         self, object_id: str, days_threshold: int = 30
@@ -96,9 +102,13 @@ class CredentialCheckerService:
             )
 
             # Create app registration model
+            app_id = app_info.get("appId")
+            display_name = app_info.get("displayName")
+            if app_id is None or display_name is None:
+                raise ValueError("appId or displayName is missing from app_info")
             app_registration = AppRegistration(
-                app_id=app_info.get("appId"),
-                display_name=app_info.get("displayName"),
+                app_id=app_id,
+                display_name=display_name,
                 object_id=object_id,
                 total_secrets=len(secrets_data),
                 total_certificates=len(certificates_data),
@@ -120,12 +130,10 @@ class CredentialCheckerService:
             print(f"❌ HTTP error checking app registration {object_id}: {e}")
             return None
         except requests.exceptions.RequestException as e:
-            print(
-                f"❌ Network error checking app registration {object_id}: {e}")
+            print(f"❌ Network error checking app registration {object_id}: {e}")
             return None
         except Exception as e:
-            print(
-                f"❌ Unexpected error checking app registration {object_id}: {e}")
+            print(f"❌ Unexpected error checking app registration {object_id}: {e}")
             return None
 
     def _check_expiring_secrets(self, secrets_data: list, days_threshold: int) -> list:

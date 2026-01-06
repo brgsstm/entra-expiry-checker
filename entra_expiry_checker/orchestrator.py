@@ -2,7 +2,7 @@
 Orchestrator for coordinating the credential expiry checking process.
 """
 
-from typing import List, Optional
+from typing import Optional
 
 from .clients.graph_client import MicrosoftGraphClient
 from .clients.table_client import TableStorageClient
@@ -110,7 +110,6 @@ class SecretExpiryOrchestrator:
         for i, (object_id, app_info) in enumerate(app_groups.items(), 1):
             display_name = app_info["display_name"]
             notification_emails = app_info["notification_emails"]
-            source = app_info["source"]
 
             print(f"📧 Processing {i}/{unique_apps}: {display_name}")
 
@@ -151,7 +150,7 @@ class SecretExpiryOrchestrator:
                             print(f"   ❌ {error_msg}")
                             results.errors.append(error_msg)
                 else:
-                    print(f"✅ No expiring credentials found")
+                    print("✅ No expiring credentials found")
 
                 results.processed += 1
 
@@ -163,7 +162,7 @@ class SecretExpiryOrchestrator:
 
         return results
 
-    def print_summary(self, results: ProcessingResult):
+    def print_summary(self, results: ProcessingResult) -> None:
         """Print a summary of the processing results."""
         print("\n" + "=" * 60)
         print("PROCESSING SUMMARY")

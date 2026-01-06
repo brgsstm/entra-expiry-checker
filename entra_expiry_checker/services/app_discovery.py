@@ -83,10 +83,12 @@ class AppDiscoveryService:
         try:
             endpoint = f"/applications/{object_id}"
             response = self.graph_client.make_request(endpoint)
-            return response.get("displayName", "Unknown")
+            display_name = response.get("displayName")
+            if display_name is None or not isinstance(display_name, str):
+                return "Unknown"
+            return str(display_name)
         except Exception as e:
-            print(
-                f"⚠️  Warning: Could not get display name for app {object_id}: {e}")
+            print(f"⚠️  Warning: Could not get display name for app {object_id}: {e}")
             return "Unknown"
 
     def _discover_from_tenant(self) -> List[dict]:
@@ -137,10 +139,13 @@ class AppDiscoveryService:
         Returns:
             List of email addresses for notifications
         """
-        emails = set()  # Use set to avoid duplicates
+        emails: set[str] = set()  # Use set to avoid duplicates
 
         # Try to get emails from app owners first
-        owners = self._get_app_owners(app.get("id"))
+        app_id = app.get("id")
+        if app_id is None or not isinstance(app_id, str):
+            return list(emails)
+        owners = self._get_app_owners(app_id)
         if owners:
             for owner in owners:
                 email = owner.get("mail") or owner.get("userPrincipalName")
@@ -167,8 +172,10 @@ class AppDiscoveryService:
         try:
             endpoint = f"/applications/{object_id}/owners"
             response = self.graph_client.make_request(endpoint)
-            return response.get("value", [])
+            value = response.get("value", [])
+            if not isinstance(value, list):
+                return []
+            return value
         except Exception as e:
-            print(
-                f"⚠️  Warning: Could not get owners for app {object_id}: {e}")
+            print(f"⚠️  Warning: Could not get owners for app {object_id}: {e}")
             return []

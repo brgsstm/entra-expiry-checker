@@ -17,7 +17,7 @@ from .orchestrator import SecretExpiryOrchestrator
 from .services.email_service import EmailService
 
 
-def main():
+def main() -> None:
     """Main function - automatically process all app registrations and send emails."""
     print("🚀 Starting app registration credential expiry check process...")
 
@@ -37,14 +37,48 @@ def main():
     # Initialize Table client (only for storage mode)
     table_client: Optional[TableStorageClient] = None
     if settings.MODE == "storage":
-        table_client = TableStorageClient(
-            settings.STG_ACCT_NAME, settings.STG_ACCT_TABLE_NAME
-        )
+        stg_name = settings.STG_ACCT_NAME
+        stg_table = settings.STG_ACCT_TABLE_NAME
+        if stg_name is None or stg_table is None:
+            print(
+                "❌ Error: STG_ACCT_NAME and STG_ACCT_TABLE_NAME required for storage mode"
+            )
+            sys.exit(1)
+        table_client = TableStorageClient(stg_name, stg_table)
 
-    # Initialize email service
-    email_service = EmailService(
-        settings.SG_API_KEY, settings.FROM_EMAIL, settings.VERIFY_SSL
-    )
+    # Initialize email service based on provider
+    if settings.EMAIL_PROVIDER == "smtp":
+        smtp_host = settings.SMTP_HOST
+        smtp_user = settings.SMTP_USER
+        smtp_password = settings.SMTP_PASSWORD
+        from_email = settings.FROM_EMAIL
+        if (
+            smtp_host is None
+            or smtp_user is None
+            or smtp_password is None
+            or from_email is None
+        ):
+            print("❌ Error: SMTP configuration incomplete")
+            sys.exit(1)
+        email_service = EmailService.create_smtp(
+            host=smtp_host,
+            port=settings.SMTP_PORT,
+            user=smtp_user,
+            password=smtp_password,
+            from_email=from_email,
+            use_tls=settings.SMTP_USE_TLS,
+            use_ssl=settings.SMTP_USE_SSL,
+            verify_ssl=settings.VERIFY_SSL,
+        )
+    else:  # default to sendgrid
+        sg_api_key = settings.SG_API_KEY
+        from_email = settings.FROM_EMAIL
+        if sg_api_key is None or from_email is None:
+            print("❌ Error: SendGrid configuration incomplete")
+            sys.exit(1)
+        email_service = EmailService.create_sendgrid(
+            sg_api_key, from_email, settings.VERIFY_SSL
+        )
 
     # Initialize orchestrator
     orchestrator = SecretExpiryOrchestrator(
@@ -52,8 +86,7 @@ def main():
     )
 
     # Process all app registrations
-    results = orchestrator.process_all_app_registrations(
-        settings.DAYS_THRESHOLD)
+    results = orchestrator.process_all_app_registrations(settings.DAYS_THRESHOLD)
 
     # Print summary
     orchestrator.print_summary(results)
@@ -63,7 +96,7 @@ def main():
         print(f"\n❌ Processing completed with {len(results.errors)} errors.")
         sys.exit(1)
     else:
-        print(f"\n✅ Processing completed successfully!")
+        print("\n✅ Processing completed successfully!")
 
 
 if __name__ == "__main__":

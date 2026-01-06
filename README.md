@@ -9,7 +9,7 @@ A Python package for monitoring and alerting on expiring secrets and certificate
 ## Features
 
 - 🔍 **Flexible Discovery**: Check all App Registrations in your tenant or specify via Azure Table Storage
-- 📧 **Email Notifications**: Send alerts via SendGrid when credentials are nearing expiration
+- 📧 **Email Notifications**: Send alerts via SendGrid or SMTP when credentials are nearing expiration
 - 🔐 **Secure Authentication**: Uses Azure CLI or Managed Identity authentication for secure access
 - 📊 **Detailed Reporting**: Comprehensive logs and summary of findings
 - 🚀 **Easy Deployment**: Works locally, with GitHub Actions, Azure DevOps, or any CI/CD platform
@@ -43,10 +43,24 @@ The identity being used (Azure CLI logged in user or Managed Identity) must have
 
 ### 2. Configure Environment Variables
 
-Set up your SendGrid API key and other required variables:
+Choose your email provider and set up the required variables:
+
+#### SendGrid
 
 ```bash
+export EMAIL_PROVIDER="sendgrid"
 export SG_API_KEY="SG.your_sendgrid_api_key"
+export FROM_EMAIL="noreply@yourdomain.com"
+```
+
+#### SMTP
+
+```bash
+export EMAIL_PROVIDER="smtp"
+export SMTP_HOST="smtp.yourdomain.com"
+export SMTP_PORT="587"
+export SMTP_USER="your_smtp_username"
+export SMTP_PASSWORD="your_smtp_password"
 export FROM_EMAIL="noreply@yourdomain.com"
 ```
 
@@ -68,11 +82,32 @@ python -m entra_expiry_checker.main
 
 | Variable         | Required | Description                            | Default  |
 | ---------------- | -------- | -------------------------------------- | -------- |
-| `SG_API_KEY`     | Yes      | SendGrid API key                       | -        |
+| `EMAIL_PROVIDER` | No       | Email provider (`sendgrid` or `smtp`) | `sendgrid` |
 | `FROM_EMAIL`     | Yes      | Sender email address                   | -        |
 | `MODE`           | No       | Operation mode (`tenant` or `storage`) | `tenant` |
 | `DAYS_THRESHOLD` | No       | Days before expiry to alert            | `30`     |
 | `VERIFY_SSL`     | No       | Enable/disable SSL verification        | `true`   |
+
+#### SendGrid Provider Variables
+
+| Variable         | Required | Description                            | Default  |
+| ---------------- | -------- | -------------------------------------- | -------- |
+| `SG_API_KEY`     | Yes*     | SendGrid API key                       | -        |
+
+*Required when `EMAIL_PROVIDER=sendgrid`
+
+#### SMTP Provider Variables
+
+| Variable         | Required | Description                            | Default  |
+| ---------------- | -------- | -------------------------------------- | -------- |
+| `SMTP_HOST`      | Yes*     | SMTP server hostname                   | -        |
+| `SMTP_PORT`      | No       | SMTP server port                       | `587`    |
+| `SMTP_USER`      | Yes*     | SMTP username                          | -        |
+| `SMTP_PASSWORD`  | Yes*     | SMTP password                          | -        |
+| `SMTP_USE_TLS`   | No       | Use STARTTLS                           | `true`   |
+| `SMTP_USE_SSL`   | No       | Use SSL/TLS from the start             | `false`  |
+
+*Required when `EMAIL_PROVIDER=smtp`
 
 #### Tenant Mode Variables
 
@@ -161,7 +196,7 @@ permissions:
 jobs:
   check-credentials:
     runs-on: ubuntu-latest
-    
+
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
@@ -186,23 +221,34 @@ jobs:
     - name: Check credential expiry
       run: entra-expiry-checker
       env:
-        # SendGrid configuration (always required)
-        SG_API_KEY: ${{ secrets.SG_API_KEY }}
+        # Email provider configuration
+        EMAIL_PROVIDER: ${{ vars.EMAIL_PROVIDER || 'sendgrid' }}
         FROM_EMAIL: ${{ vars.FROM_EMAIL }}
-        
+
+        # SendGrid configuration (required if EMAIL_PROVIDER=sendgrid)
+        SG_API_KEY: ${{ secrets.SG_API_KEY }}
+
+        # SMTP configuration (required if EMAIL_PROVIDER=smtp)
+        SMTP_HOST: ${{ vars.SMTP_HOST }}
+        SMTP_PORT: ${{ vars.SMTP_PORT || '587' }}
+        SMTP_USER: ${{ secrets.SMTP_USER }}
+        SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
+        SMTP_USE_TLS: ${{ vars.SMTP_USE_TLS || 'true' }}
+        SMTP_USE_SSL: ${{ vars.SMTP_USE_SSL || 'false' }}
+
         # Operation mode
         MODE: ${{ vars.MODE || 'tenant' }}
-        
+
         # Days threshold
         DAYS_THRESHOLD: ${{ vars.DAYS_THRESHOLD || '30' }}
 
         # Tenant mode configuration (optional if MODE=tenant)
         DEFAULT_NOTIFICATION_EMAIL: ${{ vars.DEFAULT_NOTIFICATION_EMAIL }}
-        
+
         # Storage mode configuration (only needed if MODE=storage)
         STG_ACCT_NAME: ${{ vars.STG_ACCT_NAME }}
         STG_ACCT_TABLE_NAME: ${{ vars.STG_ACCT_TABLE_NAME }}
-        
+
         # SSL verification (set to false to disable SSL certificate verification)
         VERIFY_SSL: ${{ vars.VERIFY_SSL || 'true' }}
 
@@ -211,7 +257,7 @@ jobs:
       run: |
         echo "❌ Credential expiry check failed!"
         echo "Check the logs above for details."
-        # Could add additional notification here (Slack, Teams, etc.) 
+        # Could add additional notification here (Slack, Teams, etc.)
 ```
 
 ### Azure DevOps
@@ -257,21 +303,37 @@ stages:
         inlineScript: |
           echo "Successfully authenticated with Azure"
           az account show
-          
+
           # Install Python dependencies
           python -m pip install --upgrade pip
           pip install entra-expiry-checker
-          
+
           # Run the credential check script
           entra-expiry-checker
       env:
-        # SendGrid configuration (always required)
-        SG_API_KEY: $(SG_API_KEY)
+        # Email provider configuration
+        EMAIL_PROVIDER: $(EMAIL_PROVIDER)  # Default: sendgrid
         FROM_EMAIL: $(FROM_EMAIL)
-        
+
+        # SendGrid configuration (required if EMAIL_PROVIDER=sendgrid)
+        SG_API_KEY: $(SG_API_KEY)
+
+        # SMTP configuration (required if EMAIL_PROVIDER=smtp)
+        SMTP_HOST: $(SMTP_HOST)
+        SMTP_PORT: $(SMTP_PORT)  # Default: 587
+        SMTP_USER: $(SMTP_USER)
+        SMTP_PASSWORD: $(SMTP_PASSWORD)
+        SMTP_USE_TLS: $(SMTP_USE_TLS)  # Default: true
+        SMTP_USE_SSL: $(SMTP_USE_SSL)  # Default: false
+
+        # Operation mode
+        MODE: $(MODE)  # Default: tenant
+        DAYS_THRESHOLD: $(DAYS_THRESHOLD)  # Default: 30
+        VERIFY_SSL: $(VERIFY_SSL)  # Default: true
+
         # Tenant mode configuration (only needed if MODE=tenant)
         DEFAULT_NOTIFICATION_EMAIL: $(DEFAULT_NOTIFICATION_EMAIL)
-        
+
         # Storage mode configuration (only needed if MODE=storage)
         STG_ACCT_NAME: $(STG_ACCT_NAME)
         STG_ACCT_TABLE_NAME: $(STG_ACCT_TABLE_NAME)
@@ -303,6 +365,10 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 - 💡 [Feature Requests](https://github.com/brgsstm/entra-expiry-checker/issues)
 
 ## Changelog
+
+### 1.1.0 (2026-01-06)
+
+- Add support for SMTP + better tests + dep updates
 
 ### 1.0.2 (2025-06-06)
 

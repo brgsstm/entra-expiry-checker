@@ -27,12 +27,22 @@ pip install -e .
 Create a `.env` file for local development:
 
 ```bash
-# .env
 MODE=tenant  # or storage
-SG_API_KEY=your_sendgrid_api_key
+EMAIL_PROVIDER=sendgrid  # or smtp
 FROM_EMAIL=your_email@domain.com
 DAYS_THRESHOLD=30
 VERIFY_SSL=true
+
+# SendGrid configuration (required if EMAIL_PROVIDER=sendgrid)
+SG_API_KEY=your_sendgrid_api_key
+
+# SMTP configuration (required if EMAIL_PROVIDER=smtp)
+# SMTP_HOST=smtp.yourdomain.com
+# SMTP_PORT=587
+# SMTP_USER=your_smtp_username
+# SMTP_PASSWORD=your_smtp_password
+# SMTP_USE_TLS=true
+# SMTP_USE_SSL=false
 
 # For storage mode
 STG_ACCT_NAME=your_storage_account

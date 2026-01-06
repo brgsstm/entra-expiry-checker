@@ -41,10 +41,22 @@ def main():
             settings.STG_ACCT_NAME, settings.STG_ACCT_TABLE_NAME
         )
 
-    # Initialize email service
-    email_service = EmailService(
-        settings.SG_API_KEY, settings.FROM_EMAIL, settings.VERIFY_SSL
-    )
+    # Initialize email service based on provider
+    if settings.EMAIL_PROVIDER == "smtp":
+        email_service = EmailService.create_smtp(
+            host=settings.SMTP_HOST,
+            port=settings.SMTP_PORT,
+            user=settings.SMTP_USER,
+            password=settings.SMTP_PASSWORD,
+            from_email=settings.FROM_EMAIL,
+            use_tls=settings.SMTP_USE_TLS,
+            use_ssl=settings.SMTP_USE_SSL,
+            verify_ssl=settings.VERIFY_SSL,
+        )
+    else:  # default to sendgrid
+        email_service = EmailService.create_sendgrid(
+            settings.SG_API_KEY, settings.FROM_EMAIL, settings.VERIFY_SSL
+        )
 
     # Initialize orchestrator
     orchestrator = SecretExpiryOrchestrator(

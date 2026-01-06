@@ -101,7 +101,7 @@ python -m entra_expiry_checker.main
 | Variable         | Required | Description                            | Default  |
 | ---------------- | -------- | -------------------------------------- | -------- |
 | `SMTP_HOST`      | Yes*     | SMTP server hostname                   | -        |
-| `SMTP_PORT`      | Yes*     | SMTP server port                       | `587`    |
+| `SMTP_PORT`      | No       | SMTP server port                       | `587`    |
 | `SMTP_USER`      | Yes*     | SMTP username                          | -        |
 | `SMTP_PASSWORD`  | Yes*     | SMTP password                          | -        |
 | `SMTP_USE_TLS`   | No       | Use STARTTLS                           | `true`   |
@@ -312,7 +312,7 @@ stages:
           entra-expiry-checker
       env:
         # Email provider configuration
-        EMAIL_PROVIDER: $(EMAIL_PROVIDER)
+        EMAIL_PROVIDER: $(EMAIL_PROVIDER)  # Default: sendgrid
         FROM_EMAIL: $(FROM_EMAIL)
         
         # SendGrid configuration (required if EMAIL_PROVIDER=sendgrid)
@@ -320,16 +320,16 @@ stages:
         
         # SMTP configuration (required if EMAIL_PROVIDER=smtp)
         SMTP_HOST: $(SMTP_HOST)
-        SMTP_PORT: $(SMTP_PORT)
+        SMTP_PORT: $(SMTP_PORT)  # Default: 587
         SMTP_USER: $(SMTP_USER)
         SMTP_PASSWORD: $(SMTP_PASSWORD)
-        SMTP_USE_TLS: $(SMTP_USE_TLS)
-        SMTP_USE_SSL: $(SMTP_USE_SSL)
+        SMTP_USE_TLS: $(SMTP_USE_TLS)  # Default: true
+        SMTP_USE_SSL: $(SMTP_USE_SSL)  # Default: false
         
         # Operation mode
-        MODE: $(MODE)
-        DAYS_THRESHOLD: $(DAYS_THRESHOLD)
-        VERIFY_SSL: $(VERIFY_SSL)
+        MODE: $(MODE)  # Default: tenant
+        DAYS_THRESHOLD: $(DAYS_THRESHOLD)  # Default: 30
+        VERIFY_SSL: $(VERIFY_SSL)  # Default: true
         
         # Tenant mode configuration (only needed if MODE=tenant)
         DEFAULT_NOTIFICATION_EMAIL: $(DEFAULT_NOTIFICATION_EMAIL)

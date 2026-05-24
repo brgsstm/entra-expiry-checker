@@ -98,6 +98,89 @@ class TestBuildExpiryEmailBody:
         assert "Expiring Secrets:</strong> 0" in html
         assert "Expiring Certificates:</strong> 0" in html
 
+    def test_build_email_body_escapes_html_in_app_name(self, sample_secret_expiring):
+        """Test that HTML special characters in app name are escaped."""
+        from entra_expiry_checker.models import AppRegistration
+
+        malicious_app = AppRegistration(
+            app_id="<script>alert('xss')</script>",
+            display_name='<img src=x onerror="alert(1)">Evil App',
+            object_id="<b>object-id</b>",
+            total_secrets=1,
+            total_certificates=0,
+        )
+        result = ExpiryCheckResult(
+            app_registration=malicious_app,
+            expiring_secrets=[sample_secret_expiring],
+            expiring_certificates=[],
+            days_threshold=30,
+        )
+
+        body = _build_expiry_email_body(result)
+
+        assert "<script>" not in body
+        assert "<img" not in body
+        assert "&lt;script&gt;" in body
+        assert "&lt;img" in body
+        assert "&lt;b&gt;" in body
+
+    def test_build_email_body_escapes_html_in_secret_fields(
+        self, sample_app_registration
+    ):
+        """Test that HTML special characters in secret name and key ID are escaped."""
+        from datetime import datetime, timedelta, timezone
+
+        from entra_expiry_checker.models import Secret
+
+        malicious_secret = Secret(
+            key_id='"><script>alert(1)</script>',
+            display_name="<b>Bold Secret</b>",
+            end_date=datetime.now(timezone.utc) + timedelta(days=10),
+            days_until_expiry=10,
+            is_expired=False,
+        )
+        result = ExpiryCheckResult(
+            app_registration=sample_app_registration,
+            expiring_secrets=[malicious_secret],
+            expiring_certificates=[],
+            days_threshold=30,
+        )
+
+        body = _build_expiry_email_body(result)
+
+        assert "<script>" not in body
+        assert "<b>Bold" not in body
+        assert "&lt;script&gt;" in body
+        assert "&lt;b&gt;" in body
+
+    def test_build_email_body_escapes_html_in_certificate_thumbprint(
+        self, sample_app_registration
+    ):
+        """Test that HTML special characters in certificate thumbprint are escaped."""
+        from datetime import datetime, timedelta, timezone
+
+        from entra_expiry_checker.models import Certificate
+
+        malicious_cert = Certificate(
+            key_id="cert-1",
+            display_name="Normal Cert",
+            end_date=datetime.now(timezone.utc) + timedelta(days=10),
+            days_until_expiry=10,
+            is_expired=False,
+            thumbprint="<script>alert('thumb')</script>",
+        )
+        result = ExpiryCheckResult(
+            app_registration=sample_app_registration,
+            expiring_secrets=[],
+            expiring_certificates=[malicious_cert],
+            days_threshold=30,
+        )
+
+        body = _build_expiry_email_body(result)
+
+        assert "<script>" not in body
+        assert "&lt;script&gt;" in body
+
 
 class TestSMTPProvider:
     """Test the SMTPProvider class."""

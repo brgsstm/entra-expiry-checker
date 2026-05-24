@@ -2,13 +2,13 @@
 Email notification service supporting SendGrid and SMTP.
 """
 
+import html
 import os
 import ssl
 import smtplib
 from abc import ABC, abstractmethod
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
-from typing import Any
 
 try:
     import requests  # noqa: F401
@@ -26,7 +26,11 @@ def _build_expiry_email_body(result: ExpiryCheckResult) -> str:
     """Build HTML email body for expiring credentials (shared by all providers)."""
     total_expiring = len(result.expiring_secrets) + len(result.expiring_certificates)
 
-    html = f"""
+    app_name = html.escape(result.app_registration.display_name)
+    app_id = html.escape(result.app_registration.app_id)
+    object_id = html.escape(result.app_registration.object_id)
+
+    body = f"""
     <html>
     <head>
         <style>
@@ -46,9 +50,9 @@ def _build_expiry_email_body(result: ExpiryCheckResult) -> str:
     <body>
         <div class="header">
             <h2>Entra ID App Registration Credential Expiry Alert</h2>
-            <p><strong>App Name:</strong> {result.app_registration.display_name}</p>
-            <p><strong>App ID:</strong> {result.app_registration.app_id}</p>
-            <p><strong>Object ID:</strong> {result.app_registration.object_id}</p>
+            <p><strong>App Name:</strong> {app_name}</p>
+            <p><strong>App ID:</strong> {app_id}</p>
+            <p><strong>Object ID:</strong> {object_id}</p>
             <p><strong>Expiring Secrets:</strong> {len(result.expiring_secrets)}</p>
             <p><strong>Expiring Certificates:</strong> {len(result.expiring_certificates)}</p>
             <p><strong>Days Threshold:</strong> {result.days_threshold}</p>
@@ -61,7 +65,7 @@ def _build_expiry_email_body(result: ExpiryCheckResult) -> str:
 
     # Add expiring secrets section
     if result.expiring_secrets:
-        html += f"""
+        body += f"""
         <div class="section">
             <div class="section-title">🔑 Expiring Secrets ({len(result.expiring_secrets)})</div>
         """
@@ -74,21 +78,23 @@ def _build_expiry_email_body(result: ExpiryCheckResult) -> str:
                 if secret.is_expired
                 else "credential-item expiring"
             )
+            secret_name = html.escape(secret.display_name)
+            secret_key_id = html.escape(secret.key_id)
 
-            html += f"""
+            body += f"""
             <div class="{item_class}">
-                <h4>{i}. {secret.display_name} ({secret.key_id})</h4>
+                <h4>{i}. {secret_name} ({secret_key_id})</h4>
                 <p><span class="status {status_class}">Status: {status_text}</span></p>
                 <p><strong>End Date:</strong> {secret.end_date.strftime('%Y-%m-%d %H:%M:%S UTC')}</p>
                 <p><strong>Days Until Expiry:</strong> {secret.days_until_expiry}</p>
             </div>
             """
 
-        html += "</div>"
+        body += "</div>"
 
     # Add expiring certificates section
     if result.expiring_certificates:
-        html += f"""
+        body += f"""
         <div class="section">
             <div class="section-title">📜 Expiring Certificates ({len(result.expiring_certificates)})</div>
         """
@@ -103,26 +109,33 @@ def _build_expiry_email_body(result: ExpiryCheckResult) -> str:
                 if certificate.is_expired
                 else "credential-item expiring"
             )
+            cert_name = html.escape(certificate.display_name)
+            cert_key_id = html.escape(certificate.key_id)
+            thumbprint_html = (
+                f"<p><strong>Thumbprint:</strong> {html.escape(certificate.thumbprint)}</p>"
+                if certificate.thumbprint
+                else ""
+            )
 
-            html += f"""
+            body += f"""
             <div class="{item_class}">
-                <h4>{i}. {certificate.display_name} ({certificate.key_id})</h4>
+                <h4>{i}. {cert_name} ({cert_key_id})</h4>
                 <p><span class="status {status_class}">Status: {status_text}</span></p>
                 <p><strong>End Date:</strong> {certificate.end_date.strftime('%Y-%m-%d %H:%M:%S UTC')}</p>
                 <p><strong>Days Until Expiry:</strong> {certificate.days_until_expiry}</p>
-                {f'<p><strong>Thumbprint:</strong> {certificate.thumbprint}</p>' if certificate.thumbprint else ''}
+                {thumbprint_html}
             </div>
             """
 
-        html += "</div>"
+        body += "</div>"
 
-    html += """
+    body += """
     <p><em>Please take action to rotate these credentials before they expire to avoid service disruption.</em></p>
     </body>
     </html>
     """
 
-    return html
+    return body
 
 
 class EmailProvider(ABC):
@@ -161,39 +174,14 @@ class SendGridProvider(EmailProvider):
     def _configure_ssl(self, verify_ssl: bool) -> None:
         """Configure SSL verification for SendGrid requests."""
         if not verify_ssl:
-            # Set environment variable to disable SSL verification
+            # PYTHONHTTPSVERIFY=0 is the standard Python mechanism for disabling
+            # SSL verification. Note: this affects all HTTPS connections in the
+            # process, not just SendGrid. Only set VERIFY_SSL=false in controlled
+            # environments where you accept that risk.
             os.environ["PYTHONHTTPSVERIFY"] = "0"
-
-            # Create a custom SSL context that doesn't verify certificates
-            ssl_context = ssl.create_default_context()
-            ssl_context.check_hostname = False
-            ssl_context.verify_mode = ssl.CERT_NONE
-
-            # Monkey patch the default SSL context
-            def _create_context() -> ssl.SSLContext:
-                return ssl_context
-
-            # Type ignore needed because we're monkey-patching a module-level function
-            ssl._create_default_https_context = _create_context  # type: ignore[assignment]
-
-            # Also patch requests to use our SSL context
-            import requests.adapters
-
-            class CustomHTTPAdapter(requests.adapters.HTTPAdapter):
-                def init_poolmanager(self, *args: Any, **kwargs: Any) -> Any:
-                    kwargs["ssl_context"] = ssl_context
-                    return super().init_poolmanager(*args, **kwargs)
-
-            # Create a session with custom adapter and patch it globally
-            session = requests.Session()
-            session.mount("https://", CustomHTTPAdapter())
-            session.verify = False
-
-            # Store the session for potential future use
-            self._session = session
-            print("⚠️  SSL certificate verification disabled")
-        else:
-            self._session = None
+            print(
+                "⚠️  SSL certificate verification disabled for all HTTPS connections in this process"
+            )
 
     def send_expiry_notification(
         self, to_email: str, result: ExpiryCheckResult

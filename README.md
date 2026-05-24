@@ -366,6 +366,11 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## Changelog
 
+### 1.1.1 (2026-05-24)
+
+- Security: escape HTML in email notification body to prevent injection via crafted Azure AD field values (app name, secret name, key ID, thumbprint)
+- Security: remove global SSL context monkey-patch in SendGridProvider; `VERIFY_SSL=false` now correctly uses the standard `PYTHONHTTPSVERIFY` mechanism and no longer inadvertently disables TLS verification for Graph API calls
+
 ### 1.1.0 (2026-01-06)
 
 - Add support for SMTP + better tests + dep updates
